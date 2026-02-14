@@ -1,0 +1,68 @@
+// Prisma schema
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id                  String   @id
+  shop                String
+  state               String
+  isOnline            Boolean  @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean  @default(false)
+  locale              String?
+  collaborator        Boolean? @default(false)
+  emailVerified       Boolean? @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// Settings for the storefront review gallery (one-per-shop)
+model Setting {
+  id                Int      @id @default(autoincrement())
+  shop              String   @unique
+  csvUrl            String?
+  heading           String?  @default("Customer Reviews")
+  starColor         String?  @default("#FFC107")
+  layoutStyle       String?  @default("masonry")
+  showVerifiedBadge Boolean? @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// One CSV per Product per Shop (product-specific mapping)
+model ProductCsv {
+  id           Int      @id @default(autoincrement())
+  shop         String
+
+  // If selected from Shopify
+  productId    String?  
+  productTitle String
+  productImage String?
+
+  // For manual entries (unique key per shop)
+  customKey    String?  
+
+  csvUrl       String
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([shop])
+  @@unique([shop, productId], name: "shop_productId")
+  @@unique([shop, customKey], name: "shop_customKey")
+}
+
