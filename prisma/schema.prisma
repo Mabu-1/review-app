@@ -6,9 +6,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")  // pooled for runtime
+  directUrl = env("DIRECT_URL")    // direct for migrate
 }
+
+
+
 
 model Session {
   id                  String   @id
