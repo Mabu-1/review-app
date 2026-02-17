@@ -1,6 +1,4 @@
-# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
-
-client_id = "b74af82b8744ff1ba86640c784b10afc"
+client_id = "7f05797a4adbfbf41ec24f40a0f25ace"
 name = "review-app"
 application_url = "https://review-app-9zoe.onrender.com"
 embedded = true
@@ -25,6 +23,7 @@ scopes = "write_products"
 
 [auth]
 redirect_urls = [
-  "https://review-app-9zoe.onrender.com/api/auth",
-  "https://review-app-9zoe.onrender.com/auth/callback"
+  "https://review-app-9zoe.onrender.com/auth/callback",
+  "https://review-app-9zoe.onrender.com/auth/shopify/callback",
+  "https://review-app-9zoe.onrender.com/api/auth/callback"
 ]
