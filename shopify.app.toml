@@ -2,7 +2,7 @@
 
 client_id = "b74af82b8744ff1ba86640c784b10afc"
 name = "review-app"
-application_url = "https://example.com"
+application_url = "https://review-app-9zoe.onrender.com"
 embedded = true
 
 [build]
@@ -21,8 +21,10 @@ api_version = "2026-04"
   uri = "/webhooks/app/scopes_update"
 
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "write_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [
+  "https://review-app-9zoe.onrender.com/api/auth",
+  "https://review-app-9zoe.onrender.com/auth/callback"
+]
