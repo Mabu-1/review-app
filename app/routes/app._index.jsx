@@ -4,6 +4,7 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import WriteReviewModal from "../components/WriteReviewModal";
 
 // LOADER (only global settings)
 export const loader = async ({ request }) => {
@@ -19,6 +20,7 @@ export const loader = async ({ request }) => {
     starColor: setting?.starColor || "#FFC107",
     layoutStyle: setting?.layoutStyle || "masonry",
     showVerifiedBadge: setting?.showVerifiedBadge ?? true,
+    reviewSubmitUrl: setting?.reviewSubmitUrl || "",
   };
 };
 
@@ -38,6 +40,7 @@ export const action = async ({ request }) => {
     starColor: formData.get("starColor") || "#FFC107",
     layoutStyle: formData.get("layoutStyle") || "masonry",
     showVerifiedBadge: formData.get("showVerifiedBadge") === "true",
+    reviewSubmitUrl: formData.get("reviewSubmitUrl") || "",
   };
 
   await prisma.setting.upsert({
@@ -89,6 +92,8 @@ export default function Index() {
   const [starColor, setStarColor] = useState(data.starColor);
   const [layoutStyle, setLayoutStyle] = useState(data.layoutStyle);
   const [showVerifiedBadge, setShowVerifiedBadge] = useState(data.showVerifiedBadge);
+  const [reviewSubmitUrl, setReviewSubmitUrl] = useState(data.reviewSubmitUrl);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   useEffect(() => {
     if (actionData?.toast) shopify.toast.show(actionData.toast);
@@ -104,6 +109,7 @@ export default function Index() {
         starColor,
         layoutStyle,
         showVerifiedBadge: showVerifiedBadge.toString(),
+        reviewSubmitUrl,
       },
       { method: "POST" }
     );
@@ -114,6 +120,24 @@ export default function Index() {
 
   return (
     <s-page heading="Review Gallery Pro - Dashboard">
+
+      {/* ── Write a Review button ── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button
+          onClick={() => setReviewModalOpen(true)}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "10px 20px",
+            background: "#111", color: "#fff",
+            border: "none", borderRadius: 30,
+            fontSize: 14, fontWeight: 600, cursor: "pointer",
+            letterSpacing: 0.3,
+          }}
+        >
+          ✏️ Write a Review
+        </button>
+      </div>
+
       <s-section heading="1. Data Source (Global)">
         <s-paragraph>
           Global CSV for the whole shop (optional). If you use per-product CSV, you may not need this.
@@ -173,11 +197,32 @@ export default function Index() {
         </label>
       </s-section>
 
+      <s-section heading="4. Review Submission">
+        <s-paragraph>
+          Paste your Google Apps Script Web App URL below. When customers (or you) submit a review, it will be sent here and added to your sheet as unverified. Verify manually in Google Sheets to make it appear on the storefront.
+        </s-paragraph>
+        <label style={labelStyle}>Google Apps Script Submission URL</label>
+        <input
+          type="url"
+          placeholder="https://script.google.com/macros/s/..."
+          value={reviewSubmitUrl}
+          onChange={(e) => setReviewSubmitUrl(e.target.value)}
+          style={inputStyle}
+        />
+      </s-section>
+
       <div style={{ padding: "20px 0", textAlign: "right" }}>
         <s-button variant="primary" onClick={handleSaveSettings}>
           Save All Settings
         </s-button>
       </div>
+
+      {/* ── Write a Review Modal ── */}
+      <WriteReviewModal
+        open={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        submitUrl={reviewSubmitUrl}
+      />
     </s-page>
   );
 }

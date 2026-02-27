@@ -32,6 +32,7 @@ model Session {
   emailVerified       Boolean? @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+
 }
 
 // Settings for the storefront review gallery (one-per-shop)
@@ -45,6 +46,7 @@ model Setting {
   showVerifiedBadge Boolean? @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  reviewSubmitUrl  String?  @default("")
 }
 
 // One CSV per Product per Shop (product-specific mapping)

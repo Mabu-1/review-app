@@ -7,14 +7,20 @@ import prisma from "../db.server";
 
 import ProductCsvForm from "../components/ProductCsvForm";
 import ProductCsvSidebar from "../components/ProductCsvSidebar";
+import WriteReviewModal from "../components/WriteReviewModal";
 
-// LOADER: products + product-csv mappings + shop domain
+// LOADER: products + product-csv mappings + shop domain + submit URL
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
 
   const productCsvRows = await prisma.productCsv.findMany({
     where: { shop: session.shop },
     orderBy: { updatedAt: "desc" },
+  });
+
+  // Pull reviewSubmitUrl from global settings
+  const setting = await prisma.setting.findUnique({
+    where: { shop: session.shop },
   });
 
   // Shopify products for dropdown + sidebar
@@ -39,7 +45,6 @@ export const loader = async ({ request }) => {
 
     const productJson = await productRes.json();
 
-    // Shopify GraphQL may return errors here when scope is missing
     if (productJson?.errors?.length) {
       graphqlError = productJson.errors[0]?.message || "GraphQL error";
     } else if (productJson?.data?.products?.edges) {
@@ -59,6 +64,7 @@ export const loader = async ({ request }) => {
     productCsvRows,
     shopDomain: session.shop,
     graphqlError,
+    reviewSubmitUrl: setting?.reviewSubmitUrl || "",
   };
 };
 
@@ -129,6 +135,7 @@ export default function ProductCsvsPage() {
 
   const [selectedProductId, setSelectedProductId] = useState("");
   const [productCsvUrl, setProductCsvUrl] = useState("");
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
 
   const productMap = useMemo(() => {
     const m = new Map();
@@ -176,6 +183,24 @@ export default function ProductCsvsPage() {
 
   return (
     <s-page heading="Product CSVs">
+
+      {/* ── Write a Review button ── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button
+          onClick={() => setReviewModalOpen(true)}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "10px 20px",
+            background: "#111", color: "#fff",
+            border: "none", borderRadius: 30,
+            fontSize: 14, fontWeight: 600, cursor: "pointer",
+            letterSpacing: 0.3,
+          }}
+        >
+          ✏️ Write a Review
+        </button>
+      </div>
+
       {data.graphqlError ? (
         <div style={{ padding: 12, border: "1px solid #E0B4B4", background: "#FFF6F6", borderRadius: 8, marginBottom: 16 }}>
           <strong>Shopify API Error:</strong> {data.graphqlError}
@@ -210,6 +235,15 @@ export default function ProductCsvsPage() {
           />
         </div>
       </div>
+
+      {/* ── Write a Review Modal (pre-selects currently selected product) ── */}
+      <WriteReviewModal
+        open={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        submitUrl={data.reviewSubmitUrl}
+        products={data.products || []}
+        defaultProductHandle={selectedProduct?.handle || ""}
+      />
     </s-page>
   );
 }
