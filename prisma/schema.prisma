@@ -46,7 +46,7 @@ model Setting {
   showVerifiedBadge Boolean? @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-  reviewSubmitUrl  String?  @default("")
+  
 }
 
 // One CSV per Product per Shop (product-specific mapping)
