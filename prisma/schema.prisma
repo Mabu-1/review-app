@@ -47,6 +47,7 @@ model Setting {
   // ── Rating Summary (global fallback) ─────────────────────
   globalRating      Decimal? @default(0.0) @db.Decimal(3,1)
   globalReviewCount Int?     @default(0)
+  globalRatingSource String?  @default("manual")  // "auto" | "manual"
 
   // ── Colors ───────────────────────────────────────────────
   starColor          String?  @default("#FFC107")
@@ -101,6 +102,8 @@ model ProductCsv {
   // ── Rating Summary (per product) ─────────────────────────
   rating      Decimal? @default(0.0) @db.Decimal(3,1)
   reviewCount Int?     @default(0)
+  ratingSource String?  @default("manual")  // "auto" | "manual"
+  submitUrl    String?
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -108,4 +111,22 @@ model ProductCsv {
   @@index([shop])
   @@unique([shop, productId], name: "shop_productId")
   @@unique([shop, customKey], name: "shop_customKey")
+}
+
+model PendingReview {
+  id           String   @id @default(cuid())
+  shop         String
+  productId    String
+  productTitle String   @default("")
+  rowIndex     Int
+  author       String   @default("")
+  rating       Int      @default(5)
+  body         String   @default("")
+  date         String   @default("")
+  photoUrl     String   @default("")
+  variant      String   @default("")
+  seenAt       DateTime @default(now())
+
+  @@index([shop])
+  @@unique([shop, productId, rowIndex])
 }

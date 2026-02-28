@@ -4,6 +4,7 @@
   "scripts": {
     "build": "react-router build",
     "dev": "shopify app dev",
+    "dev:clean": "kill $(lsof -ti:9293); kill $(lsof -ti:3000); shopify app dev",
     "config:link": "shopify app config link",
     "generate": "shopify app generate",
     "deploy": "shopify app deploy",
@@ -66,8 +67,10 @@
   "trustedDependencies": [
     "@shopify/plugin-cloudflare"
   ],
+  
   "overrides": {
     "p-map": "^4.0.0"
   },
-  "author": "bbdeveloper-01"
+  "author": "BrandsBro-APP"
+  
 }

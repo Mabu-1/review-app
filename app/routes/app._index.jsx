@@ -4,14 +4,15 @@ import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { prismaRetry } from "../utils/prismaRetry.server";
 
 // ─── LOADER ──────────────────────────────────────────────────────────────────
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
 
-  const setting = await prisma.setting.findUnique({
-    where: { shop: session.shop },
-  });
+  const setting = await prismaRetry(() =>
+    prisma.setting.findUnique({ where: { shop: session.shop } })
+  );
 
   return {
     // Data source
@@ -55,8 +56,9 @@ export const loader = async ({ request }) => {
     formSubmitUrl:  setting?.formSubmitUrl  || "",
 
     // Rating summary (global fallback)
-    globalRating:      parseFloat(setting?.globalRating      || 0),
-    globalReviewCount: parseInt(  setting?.globalReviewCount || 0),
+    globalRating:       parseFloat(setting?.globalRating      || 0),
+    globalReviewCount:  parseInt(  setting?.globalReviewCount || 0),
+    globalRatingSource: setting?.globalRatingSource || 'manual',
   };
 };
 
@@ -112,16 +114,19 @@ export const action = async ({ request }) => {
     formSubmitUrl:  formData.get("formSubmitUrl")  || "",
 
     // Rating summary (global fallback)
-    globalRating:      parseFloat(formData.get("globalRating")      || "0"),
-    globalReviewCount: parseInt(  formData.get("globalReviewCount") || "0"),
+    globalRating:       parseFloat(formData.get("globalRating")       || "0"),
+    globalReviewCount:  parseInt(  formData.get("globalReviewCount")  || "0"),
+    globalRatingSource: formData.get("globalRatingSource") || "manual",
   };
 
   // Save to DB
-  await prisma.setting.upsert({
-    where:  { shop: session.shop },
-    update: settingsData,
-    create: { shop: session.shop, ...settingsData },
-  });
+  await prismaRetry(() =>
+    prisma.setting.upsert({
+      where:  { shop: session.shop },
+      update: settingsData,
+      create: { shop: session.shop, ...settingsData },
+    })
+  );
 
   // Sync ALL settings to shop metafield as JSON
   const shopResponse = await admin.graphql(`{ shop { id } }`);
@@ -203,6 +208,7 @@ export default function Index() {
   const data       = useLoaderData();
   const actionData = useActionData();
   const submit     = useSubmit();
+  const [isSaving, setIsSaving] = useState(false);
 
   // Data source
   const [csvUrl, setCsvUrl] = useState(data.csvUrl);
@@ -245,15 +251,55 @@ export default function Index() {
   const [formSubmitUrl,  setFormSubmitUrl]  = useState(data.formSubmitUrl);
 
   // Rating summary
-  const [globalRating,      setGlobalRating]      = useState(data.globalRating);
-  const [globalReviewCount, setGlobalReviewCount] = useState(data.globalReviewCount);
+  const [globalRating,       setGlobalRating]       = useState(data.globalRating);
+  const [globalReviewCount,  setGlobalReviewCount]  = useState(data.globalReviewCount);
+  const [globalRatingSource, setGlobalRatingSource] = useState(data.globalRatingSource);
+  const [csvStats,           setCsvStats]           = useState(null);
+  const [csvStatsLoading,    setCsvStatsLoading]    = useState(false);
 
   useEffect(() => {
-    if (actionData?.toast) shopify.toast.show(actionData.toast);
-    if (actionData?.error) shopify.toast.show(actionData.error);
+    if (actionData?.toast) { shopify.toast.show(actionData.toast); setIsSaving(false); }
+    if (actionData?.error) { shopify.toast.show(actionData.error); setIsSaving(false); }
   }, [actionData, shopify]);
 
+  // Fetch global CSV to calculate stats in auto mode
+  useEffect(() => {
+    setCsvStats(null);
+    if (globalRatingSource !== "auto" || !csvUrl) return;
+
+    setCsvStatsLoading(true);
+    const sep = csvUrl.includes("?") ? "&" : "?";
+    fetch(csvUrl + sep + "t=" + Date.now())
+      .then((r) => r.text())
+      .then((text) => {
+        const parseRow = (line) => {
+          const cols = []; let cur = "", inQ = false;
+          for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') { inQ = !inQ; }
+            else if (ch === "," && !inQ) { cols.push(cur.trim()); cur = ""; }
+            else { cur += ch; }
+          }
+          cols.push(cur.trim());
+          return cols;
+        };
+        const lines = text.trim().split("\n");
+        lines.shift();
+        let sum = 0, count = 0;
+        lines.forEach((line) => {
+          if (!line.trim()) return;
+          const cols = parseRow(line);
+          const r = parseFloat(cols[1]);
+          if (!isNaN(r) && r > 0) { sum += r; count++; }
+        });
+        setCsvStats({ avg: count > 0 ? (sum / count).toFixed(1) : "0.0", count });
+        setCsvStatsLoading(false);
+      })
+      .catch(() => { setCsvStats(null); setCsvStatsLoading(false); });
+  }, [globalRatingSource, csvUrl]);
+
   const handleSave = () => {
+    setIsSaving(true);
     submit(
       {
         intent: "save_settings",
@@ -290,8 +336,9 @@ export default function Index() {
         formSuccessMsg,
         formSubmitUrl,
 
-        globalRating:      String(globalRating),
-        globalReviewCount: String(globalReviewCount),
+        globalRating:       String(globalRating),
+        globalReviewCount:  String(globalReviewCount),
+        globalRatingSource,
       },
       { method: "POST" }
     );
@@ -318,31 +365,102 @@ export default function Index() {
       {/* ── 2. RATING SUMMARY (GLOBAL) ─────────────────────── */}
       <s-section heading="2. Rating Summary (Global)">
         <s-paragraph>
-          These are the fallback rating numbers shown on any page that doesn't have a per-product rating set.
+          Fallback rating shown on any page that doesn't have a per-product rating set.
         </s-paragraph>
-        <div style={{ display: "flex", gap: 20 }}>
-          <div style={{ flex: 1 }}>
-            <label style={label}>Average Rating (e.g. 4.8)</label>
-            <input
-              type="number"
-              min="0"
-              max="5"
-              step="0.1"
-              value={globalRating}
-              onChange={(e) => setGlobalRating(parseFloat(e.target.value) || 0)}
-              style={input}
-            />
+
+        {/* Toggle */}
+        <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+          {["auto", "manual"].map((opt) => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setGlobalRatingSource(opt)}
+              style={{
+                padding: "8px 20px", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                border: globalRatingSource === opt ? "2px solid #111" : "1px solid #c9cccf",
+                background: globalRatingSource === opt ? "#111" : "#fff",
+                color: globalRatingSource === opt ? "#fff" : "#333",
+              }}
+            >
+              {opt === "auto" ? "⚡ Auto-calculate from CSV" : "✏️ Manual"}
+            </button>
+          ))}
+        </div>
+
+        {globalRatingSource === "auto" ? (
+          <div style={{ padding: "14px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, fontSize: 13, color: "#15803d" }}>
+            ✅ Rating and review count will be automatically calculated from your CSV data each time the gallery loads. No manual input needed.
           </div>
-          <div style={{ flex: 1 }}>
-            <label style={label}>Total Review Count (e.g. 124)</label>
-            <input
-              type="number"
-              min="0"
-              step="1"
-              value={globalReviewCount}
-              onChange={(e) => setGlobalReviewCount(parseInt(e.target.value) || 0)}
-              style={input}
-            />
+        ) : (
+          <div style={{ display: "flex", gap: 20 }}>
+            <div style={{ flex: 1 }}>
+              <label style={label}>Average Rating (e.g. 4.8)</label>
+              <input
+                type="number"
+                min="0"
+                max="5"
+                step="0.1"
+                value={globalRating}
+                onChange={(e) => { const val = parseFloat(e.target.value) || 0; setGlobalRating(Math.min(5, Math.max(0, val))); }}
+                style={input}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={label}>Total Review Count (e.g. 124)</label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={globalReviewCount}
+                onChange={(e) => setGlobalReviewCount(parseInt(e.target.value) || 0)}
+                style={input}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Live Preview */}
+        <div style={{ marginTop: 16, padding: "16px 20px", background: "#f8f9fa", border: "1px solid #e1e3e5", borderRadius: 10 }}>
+          <div style={{ fontSize: 11, color: "#6d7175", marginBottom: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Preview
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {/* Stars */}
+            <div style={{ display: "flex", gap: 2 }}>
+              {[1,2,3,4,5].map((star) => {
+                const r = globalRatingSource === "auto" ? 5 : globalRating;
+                const filled = star <= Math.floor(r);
+                const half   = !filled && star === Math.ceil(r) && r % 1 >= 0.3;
+                return (
+                  <svg key={star} width="18" height="18" viewBox="0 0 24 24">
+                    <defs>
+                      <linearGradient id={"sg" + star}>
+                        <stop offset={filled ? "100%" : half ? "50%" : "0%"} stopColor={starColor} />
+                        <stop offset={filled ? "100%" : half ? "50%" : "0%"} stopColor="#e1e3e5" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" fill={filled ? starColor : half ? "url(#sg"+star+")" : "#e1e3e5"} />
+                  </svg>
+                );
+              })}
+            </div>
+            {globalRatingSource === "auto" ? (
+              csvStatsLoading ? (
+                <span style={{ fontSize: 13, color: "#6d7175" }}>Calculating from CSV…</span>
+              ) : csvStats ? (
+                <>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "#202223" }}>{csvStats.avg}</span>
+                  <span style={{ fontSize: 13, color: "#6d7175" }}>({csvStats.count} reviews) — auto</span>
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: "#6d7175" }}>⚡ Will calculate from CSV on storefront</span>
+              )
+            ) : (
+              <>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#202223" }}>{parseFloat(globalRating).toFixed(1)}</span>
+                <span style={{ fontSize: 13, color: "#6d7175" }}>({globalReviewCount} reviews)</span>
+              </>
+            )}
           </div>
         </div>
       </s-section>
@@ -472,9 +590,26 @@ export default function Index() {
 
       {/* ── SAVE BUTTON ────────────────────────────────────── */}
       <div style={{ padding: "24px 0", textAlign: "right" }}>
-        <s-button variant="primary" onClick={handleSave}>
-          Save All Settings
-        </s-button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={isSaving}
+          style={{
+            display: "inline-flex", alignItems: "center", gap: 8,
+            padding: "10px 24px", background: isSaving ? "#6d7175" : "#111",
+            color: "#fff", border: "none", borderRadius: 6,
+            fontSize: 14, fontWeight: 600, cursor: isSaving ? "not-allowed" : "pointer",
+            transition: "background 0.2s",
+          }}
+        >
+          {isSaving ? (
+            <>
+              <span style={{ width: 14, height: 14, border: "2px solid rgba(255,255,255,0.4)", borderTop: "2px solid #fff", borderRadius: "50%", display: "inline-block", animation: "rg-spin 0.7s linear infinite" }} />
+              Saving…
+            </>
+          ) : "Save All Settings"}
+        </button>
+        <style>{`@keyframes rg-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
 
     </s-page>

@@ -42,7 +42,10 @@
   # CSV — product overrides global
   assign cfg_csv_url = product.metafields.review_gallery.csv_url.value | default: s.csvUrl | default: ''
 
-# Rating summary — product overrides global
+  # Rating source — product overrides global
+  assign cfg_rating_source = product.metafields.review_gallery.rating_source.value | default: s.globalRatingSource | default: 'manual'
+
+  # Rating summary — product overrides global (used only in manual mode)
   assign meta_rating = product.metafields.review_gallery.rating.value | plus: 0.0
   assign meta_count  = product.metafields.review_gallery.review_count.value | plus: 0
 
@@ -640,8 +643,8 @@
         {%- endfor -%}
       </div>
       <div class="rg-rating-info">
-        <div class="rg-avg-rating"><span id="rg-avg-{{ section.id }}">{{ meta_rating }}</span> out of 5</div>
-        <div class="rg-review-count"><span id="rg-count-{{ section.id }}">{{ meta_count }}+</span> Reviews</div>
+        <div class="rg-avg-rating"><span id="rg-avg-{{ section.id }}">{% if cfg_rating_source == 'auto' %}…{% else %}{{ meta_rating }}{% endif %}</span> out of 5</div>
+        <div class="rg-review-count"><span id="rg-count-{{ section.id }}">{% if cfg_rating_source == 'auto' %}…{% else %}{{ meta_count }}{% endif %}</span> Reviews</div>
       </div>
     </div>
 
@@ -809,6 +812,9 @@
     colsMobile:     {{ cfg_cols_mobile }},
     submitUrl:      {{ cfg_form_submit_url | json }},
     starColor:      {{ cfg_star_color | json }},
+    ratingSource:   {{ cfg_rating_source | json }},
+    manualRating:   {{ meta_rating }},
+    manualCount:    {{ meta_count }},
   };
 
   /* ── DOM refs ── */
@@ -816,6 +822,8 @@
   const loadingEl  = document.getElementById('rg-loading-'   + SID);
   const emptyEl    = document.getElementById('rg-empty-'     + SID);
   const loadMoreBtn= document.getElementById('rg-load-more-' + SID);
+  const avgEl      = document.getElementById('rg-avg-'       + SID);
+  const countEl    = document.getElementById('rg-count-'     + SID);
   const sortSelect = document.getElementById('rg-sort-'      + SID);
   const searchInput= document.getElementById('rg-search-'    + SID);
 
@@ -875,6 +883,18 @@
     loadingEl.style.display = 'none';
 
     if (allReviews.length > 0) {
+      // Auto-calculate rating + count from CSV if ratingSource is auto
+      if (settings.ratingSource === 'auto') {
+        const total = allReviews.length;
+        const sum   = allReviews.reduce((acc, r) => acc + r.rating, 0);
+        const avg   = total > 0 ? (sum / total).toFixed(1) : '0.0';
+        if (avgEl)   avgEl.textContent   = avg;
+        if (countEl) countEl.textContent = total;
+      } else {
+        if (avgEl)   avgEl.textContent   = settings.manualRating;
+        if (countEl) countEl.textContent = settings.manualCount;
+      }
+
       filteredReviews = [...allReviews];
       applySorting();
       currentLimit = settings.initialLoad;

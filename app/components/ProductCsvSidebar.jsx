@@ -30,13 +30,72 @@ function StarIcon({ size = 13 }) {
   );
 }
 
+function TrashIcon({ size = 15 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+import { useState, useEffect } from "react";
+
 export default function ProductCsvSidebar({
   rows,
   selectedProductId,
   onSelect,
+  onDelete,
+  isDeleting,
   shopDomain,
   products,
 }) {
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [csvStatsMap,   setCsvStatsMap]   = useState({});
+
+  // Fetch CSV stats for auto products
+  useEffect(() => {
+    const parseRow = (line) => {
+      const cols = []; let cur = "", inQ = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === "," && !inQ) { cols.push(cur.trim()); cur = ""; }
+        else { cur += ch; }
+      }
+      cols.push(cur.trim());
+      return cols;
+    };
+
+    (rows || []).forEach((r) => {
+      if (r.ratingSource !== "auto" || !r.csvUrl) return;
+      const sep = r.csvUrl.includes("?") ? "&" : "?";
+      fetch(r.csvUrl + sep + "t=" + Date.now())
+        .then((res) => res.text())
+        .then((text) => {
+          const lines = text.trim().split("\n");
+          lines.shift();
+          let sum = 0, count = 0;
+          lines.forEach((line) => {
+            if (!line.trim()) return;
+            const cols = parseRow(line);
+            const rating = parseFloat(cols[1]);
+            if (!isNaN(rating) && rating > 0) { sum += rating; count++; }
+          });
+          const avg = count > 0 ? (sum / count).toFixed(1) : "0.0";
+          setCsvStatsMap((prev) => ({ ...prev, [r.productId]: { avg, count } }));
+        })
+        .catch(() => {});
+    });
+  }, [rows]);
+
+  // Close confirm box after deletion completes
+  useEffect(() => {
+    if (!isDeleting) setConfirmingId(null);
+  }, [isDeleting]);
+
   const openStorefront = (productGid) => {
     if (!shopDomain) return;
     const p = (products || []).find((x) => x.id === productGid);
@@ -46,9 +105,10 @@ export default function ProductCsvSidebar({
 
   const openAdmin = (productGid) => {
     if (!shopDomain) return;
-    const numericId = getNumericProductId(productGid);
+    const numericId   = getNumericProductId(productGid);
     if (!numericId) return;
-    window.open(`https://${shopDomain}/admin/products/${numericId}`, "_blank", "noopener,noreferrer");
+    const storeHandle = shopDomain.replace(".myshopify.com", "");
+    window.open(`https://admin.shopify.com/store/${storeHandle}/products/${numericId}`, "_blank", "noopener,noreferrer");
   };
 
   const btnStyle = {
@@ -77,6 +137,7 @@ export default function ProductCsvSidebar({
           </div>
         ) : (
           rows.map((r) => {
+            const isAuto      = r.ratingSource === "auto";
             const rating      = parseFloat(r.rating?.toString() || "0").toFixed(1);
             const reviewCount = parseInt(r.reviewCount?.toString() || "0");
             const hasRating   = parseFloat(r.rating?.toString() || "0") > 0;
@@ -106,13 +167,34 @@ export default function ProductCsvSidebar({
 
                   {/* Rating + review count */}
                   <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-                    <StarIcon />
-                    <span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>
-                      {hasRating ? rating : "—"}
-                    </span>
-                    <span style={{ fontSize: 12, color: "#6d7175" }}>
-                      {reviewCount > 0 ? `(${reviewCount} reviews)` : "(no reviews set)"}
-                    </span>
+                    {isAuto ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{
+                          display: "inline-flex", alignItems: "center", gap: 4,
+                          background: "#f0fdf4", border: "1px solid #bbf7d0",
+                          borderRadius: 6, padding: "2px 8px", fontSize: 12, color: "#15803d", fontWeight: 600
+                        }}>⚡ Auto</span>
+                        {csvStatsMap[r.productId] ? (
+                          <>
+                            <StarIcon />
+                            <span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>{csvStatsMap[r.productId].avg}</span>
+                            <span style={{ fontSize: 12, color: "#6d7175" }}>({csvStatsMap[r.productId].count} reviews)</span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: 12, color: "#6d7175" }}>loading…</span>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <StarIcon />
+                        <span style={{ fontSize: 13, fontWeight: 600, color: "#202223" }}>
+                          {hasRating ? rating : "—"}
+                        </span>
+                        <span style={{ fontSize: 12, color: "#6d7175" }}>
+                          {reviewCount > 0 ? `(${reviewCount} reviews)` : "(no reviews set)"}
+                        </span>
+                      </>
+                    )}
                   </div>
 
                   {/* CSV URL */}
@@ -139,7 +221,50 @@ export default function ProductCsvSidebar({
                   >
                     <GearIcon />
                   </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setConfirmingId(r.productId); }}
+                    title="Remove this product CSV"
+                    style={{ ...btnStyle, color: "#d72c0d", borderColor: "#fead9a" }}
+                  >
+                    <TrashIcon />
+                  </button>
                 </div>
+
+                {/* Inline confirm */}
+                {confirmingId === r.productId && (
+                  <div style={{ marginTop: 10, background: "#fff4f4", border: "1px solid #fead9a", borderRadius: 8, padding: "12px 14px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#d72c0d", marginBottom: 8 }}>
+                      Remove "{r.productTitle}"?
+                    </div>
+                    <div style={{ fontSize: 12, color: "#6d7175", marginBottom: 10 }}>
+                      This will delete the CSV, rating and review count. Cannot be undone.
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDelete && onDelete(r.productId, r.productTitle); }}
+                        disabled={isDeleting}
+                        style={{ flex: 1, padding: "7px 0", background: "#d72c0d", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                      >
+                        {isDeleting ? (
+                          <>
+                            <span style={{ width: 12, height: 12, border: "2px solid rgba(255,255,255,0.4)", borderTop: "2px solid #fff", borderRadius: "50%", display: "inline-block", animation: "rg-spin 0.7s linear infinite" }} />
+                            Removing…
+                          </>
+                        ) : "Yes, Remove"}
+                      </button>
+                      <style>{`@keyframes rg-spin { to { transform: rotate(360deg); } }`}</style>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setConfirmingId(null); }}
+                        style={{ flex: 1, padding: "7px 0", background: "#fff", color: "#333", border: "1px solid #c9cccf", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
