@@ -11,14 +11,11 @@ datasource db {
   directUrl = env("DIRECT_URL")    // direct for migrate
 }
 
-
-
-
 model Session {
-  id                  String   @id
+  id                  String    @id
   shop                String
   state               String
-  isOnline            Boolean  @default(false)
+  isOnline            Boolean   @default(false)
   scope               String?
   expires             DateTime?
   accessToken         String
@@ -26,27 +23,64 @@ model Session {
   firstName           String?
   lastName            String?
   email               String?
-  accountOwner        Boolean  @default(false)
+  accountOwner        Boolean   @default(false)
   locale              String?
-  collaborator        Boolean? @default(false)
-  emailVerified       Boolean? @default(false)
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
-
 }
 
 // Settings for the storefront review gallery (one-per-shop)
 model Setting {
-  id                Int      @id @default(autoincrement())
-  shop              String   @unique
-  csvUrl            String?
-  heading           String?  @default("Customer Reviews")
-  starColor         String?  @default("#FFC107")
-  layoutStyle       String?  @default("masonry")
-  showVerifiedBadge Boolean? @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  
+  id        Int      @id @default(autoincrement())
+  shop      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ── Data Source ──────────────────────────────────────────
+  csvUrl    String?
+
+  // ── Content ──────────────────────────────────────────────
+  heading   String?  @default("Customer Reviews")
+
+  // ── Rating Summary (global fallback) ─────────────────────
+  globalRating      Decimal? @default(0.0) @db.Decimal(3,1)
+  globalReviewCount Int?     @default(0)
+
+  // ── Colors ───────────────────────────────────────────────
+  starColor          String?  @default("#FFC107")
+  bgColor            String?  @default("#f8f9fa")
+  cardBgColor        String?  @default("#ffffff")
+  textColor          String?  @default("#333333")
+  buttonBg           String?  @default("#111111")
+  buttonText         String?  @default("#ffffff")
+  verifiedBadgeColor String?  @default("#4CAF50")
+  formAccentColor    String?  @default("#111111")
+
+  // ── Layout ───────────────────────────────────────────────
+  cardLayout      String?  @default("masonry")   // masonry | natural | equal
+  columnsDesktop  Int?     @default(4)
+  columnsMobile   Int?     @default(1)
+
+  // ── Load Counts ──────────────────────────────────────────
+  initialLoadCount Int?  @default(12)
+  loadMoreCount    Int?  @default(12)
+
+  // ── Feature Toggles ──────────────────────────────────────
+  showVerifiedBadge   Boolean? @default(true)
+  showSearch          Boolean? @default(true)
+  showFilters         Boolean? @default(true)
+  showSorting         Boolean? @default(true)
+  showLightbox        Boolean? @default(true)
+  showLoadMore        Boolean? @default(true)
+  showWriteReviewBtn  Boolean? @default(true)
+
+  // ── Write a Review Form ───────────────────────────────────
+  formTitle      String?  @default("Share Your Experience")
+  formSubtitle   String?  @default("Your honest review helps other customers make better decisions.")
+  formSuccessMsg String?  @default("Thank you for your review! It will appear shortly after approval.")
+  formSubmitUrl  String?
 }
 
 // One CSV per Product per Shop (product-specific mapping)
@@ -55,14 +89,18 @@ model ProductCsv {
   shop         String
 
   // If selected from Shopify
-  productId    String?  
+  productId    String?
   productTitle String
   productImage String?
 
   // For manual entries (unique key per shop)
-  customKey    String?  
+  customKey    String?
 
   csvUrl       String
+
+  // ── Rating Summary (per product) ─────────────────────────
+  rating      Decimal? @default(0.0) @db.Decimal(3,1)
+  reviewCount Int?     @default(0)
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -71,4 +109,3 @@ model ProductCsv {
   @@unique([shop, productId], name: "shop_productId")
   @@unique([shop, customKey], name: "shop_customKey")
 }
-

@@ -1,0 +1,1204 @@
+{% liquid
+  # ── 1. READ APP SETTINGS FROM METAFIELD ──────────────────────────────────
+  assign s = shop.metafields.review_gallery.settings.value
+
+  # Content
+  assign cfg_heading      = s.heading      | default: 'Customer Reviews'
+
+  # Colors
+  assign cfg_star_color          = s.starColor          | default: '#FFC107'
+  assign cfg_bg_color            = s.bgColor            | default: '#f8f9fa'
+  assign cfg_card_bg             = s.cardBgColor        | default: '#ffffff'
+  assign cfg_text_color          = s.textColor          | default: '#333333'
+  assign cfg_button_bg           = s.buttonBg           | default: '#111111'
+  assign cfg_button_text         = s.buttonText         | default: '#ffffff'
+  assign cfg_verified_color      = s.verifiedBadgeColor | default: '#4CAF50'
+  assign cfg_form_accent         = s.formAccentColor    | default: '#111111'
+
+  # Layout
+  assign cfg_card_layout     = s.cardLayout     | default: 'masonry'
+  assign cfg_cols_desktop    = s.columnsDesktop | default: 4
+  assign cfg_cols_mobile     = s.columnsMobile  | default: 1
+
+  # Load counts
+  assign cfg_initial_load  = s.initialLoadCount | default: 12
+  assign cfg_load_more     = s.loadMoreCount    | default: 12
+
+  # Feature toggles
+  assign cfg_show_verified    = s.showVerifiedBadge  | default: true
+  assign cfg_show_search      = s.showSearch         | default: true
+  assign cfg_show_filters     = s.showFilters        | default: true
+  assign cfg_show_sorting     = s.showSorting        | default: true
+  assign cfg_show_lightbox    = s.showLightbox       | default: true
+  assign cfg_show_load_more   = s.showLoadMore       | default: true
+  assign cfg_show_write_btn   = s.showWriteReviewBtn | default: true
+
+  # Write a review form
+  assign cfg_form_title      = s.formTitle      | default: 'Share Your Experience'
+  assign cfg_form_subtitle   = s.formSubtitle   | default: 'Your honest review helps other customers make better decisions.'
+  assign cfg_form_success    = s.formSuccessMsg | default: 'Thank you for your review! It will appear shortly after approval.'
+  assign cfg_form_submit_url = s.formSubmitUrl  | default: ''
+
+  # CSV — product overrides global
+  assign cfg_csv_url = product.metafields.review_gallery.csv_url.value | default: s.csvUrl | default: ''
+
+# Rating summary — product overrides global
+  assign meta_rating = product.metafields.review_gallery.rating.value | plus: 0.0
+  assign meta_count  = product.metafields.review_gallery.review_count.value | plus: 0
+
+  assign global_rating = s.globalRating      | plus: 0.0
+  assign global_count  = s.globalReviewCount | plus: 0
+
+  if meta_rating == 0
+    assign meta_rating = global_rating
+  endif
+  if meta_count == 0
+    assign meta_count = global_count
+  endif
+
+  assign stars_floor = meta_rating | floor
+  assign stars_next  = stars_floor | plus: 1
+  assign stars_dec   = meta_rating | modulo: 1
+%}
+
+{% schema %}
+{
+  "name": "CSV Review Gallery Pro",
+  "target": "section",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Section Spacing (Desktop)"
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "min": 0, "max": 100, "step": 4, "unit": "px",
+      "label": "Top Padding",
+      "default": 60
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "min": 0, "max": 100, "step": 4, "unit": "px",
+      "label": "Bottom Padding",
+      "default": 60
+    },
+    {
+      "type": "range",
+      "id": "margin_top",
+      "min": 0, "max": 100, "step": 4, "unit": "px",
+      "label": "Top Margin",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom",
+      "min": 0, "max": 100, "step": 4, "unit": "px",
+      "label": "Bottom Margin",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "Section Spacing (Mobile)"
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "min": 0, "max": 100, "step": 4, "unit": "px",
+      "label": "Top Padding",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "min": 0, "max": 100, "step": 4, "unit": "px",
+      "label": "Bottom Padding",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "margin_top_mobile",
+      "min": 0, "max": 100, "step": 4, "unit": "px",
+      "label": "Top Margin",
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "margin_bottom_mobile",
+      "min": 0, "max": 100, "step": 4, "unit": "px",
+      "label": "Bottom Margin",
+      "default": 0
+    },
+    {
+      "type": "header",
+      "content": "Section Width"
+    },
+    {
+      "type": "range",
+      "id": "max_width",
+      "min": 1000, "max": 2000, "step": 10, "unit": "px",
+      "label": "Max Width",
+      "default": 1300
+    }
+  ]
+}
+{% endschema %}
+
+<style>
+  #shopify-section-{{ section.id }} {
+    background-color: {{ cfg_bg_color }};
+    width: 100%;
+    padding-top: {{ section.settings.padding_top_mobile }}px;
+    padding-bottom: {{ section.settings.padding_bottom_mobile }}px;
+    padding-left: 20px;
+    padding-right: 20px;
+    margin-top: {{ section.settings.margin_top_mobile }}px;
+    margin-bottom: {{ section.settings.margin_bottom_mobile }}px;
+  }
+
+  @media (min-width: 768px) {
+    #shopify-section-{{ section.id }} {
+      padding-top: {{ section.settings.padding_top }}px;
+      padding-bottom: {{ section.settings.padding_bottom }}px;
+      margin-top: {{ section.settings.margin_top }}px;
+      margin-bottom: {{ section.settings.margin_bottom }}px;
+    }
+  }
+
+  .rg-container-{{ section.id }} {
+    max-width: {{ section.settings.max_width }}px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .rg-section-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: {{ cfg_text_color }};
+    margin-bottom: 20px;
+  }
+
+  .rg-header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid rgba(0,0,0,0.05);
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .rg-rating-summary { display: flex; align-items: center; gap: 12px; }
+  .rg-total-stars { font-size: 28px; color: {{ cfg_star_color }}; letter-spacing: 2px; }
+  .rg-rating-info { display: flex; flex-direction: column; }
+  .rg-avg-rating { font-size: 20px; font-weight: 700; color: {{ cfg_text_color }}; line-height: 1.2; }
+  .rg-review-count { font-size: 14px; color: #666; }
+
+  .rg-filter-section { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  .rg-search-input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    outline: none;
+    min-width: 150px;
+    transition: border 0.2s;
+  }
+  .rg-search-input:focus { border-color: #666; }
+
+  .rg-filter-btn {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    background: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #333;
+    transition: all 0.2s ease;
+  }
+  .rg-filter-btn:hover { border-color: #999; background: #f5f5f5; }
+  .rg-filter-btn.active {
+    background: {{ cfg_button_bg }};
+    color: {{ cfg_button_text }};
+    border-color: {{ cfg_button_bg }};
+  }
+
+  .rg-sort-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    font-size: 13px;
+    cursor: pointer;
+    color: #333;
+  }
+
+  .rg-write-review-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    background: {{ cfg_button_bg }};
+    color: {{ cfg_button_text }};
+    border: 2px solid {{ cfg_button_bg }};
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+  }
+  .rg-write-review-btn svg {
+    width: 16px; height: 16px;
+    fill: none; stroke: currentColor;
+    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+    flex-shrink: 0;
+  }
+  .rg-write-review-btn:hover {
+    opacity: 0.85;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+  }
+
+  /* Grid */
+  .rg-grid {
+    {% if cfg_card_layout == 'masonry' %}
+    position: relative;
+    width: 100%;
+    {% else %}
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    {% if cfg_card_layout == 'equal' %}
+    grid-auto-rows: 1fr;
+    {% else %}
+    grid-auto-rows: auto;
+    align-items: start;
+    {% endif %}
+    {% endif %}
+    width: 100%;
+    padding-bottom: 20px;
+    box-sizing: border-box;
+  }
+
+  @media (min-width: 768px) {
+    .rg-grid {
+      {% if cfg_card_layout != 'masonry' %}
+      grid-template-columns: repeat({{ cfg_cols_mobile }}, 1fr);
+      {% endif %}
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .rg-grid {
+      {% if cfg_card_layout != 'masonry' %}
+      grid-template-columns: repeat({{ cfg_cols_desktop }}, 1fr);
+      {% endif %}
+    }
+  }
+
+  /* Card */
+  .rg-card {
+    {% if cfg_card_layout == 'masonry' %}
+    position: absolute;
+    {% else %}
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    {% if cfg_card_layout == 'equal' %}
+    height: 100%;
+    {% endif %}
+    {% endif %}
+    box-sizing: border-box;
+    background: {{ cfg_card_bg }};
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid rgba(0,0,0,0.05);
+    animation: rgFadeIn 0.5s ease;
+  }
+  .rg-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+
+  @keyframes rgFadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Skeleton */
+  @keyframes shimmer {
+    0%   { background-position: -1000px 0; }
+    100% { background-position:  1000px 0; }
+  }
+  .rg-skeleton-card {
+    {% if cfg_card_layout == 'masonry' %}position: absolute;{% else %}display: flex; flex-direction: column;{% endif %}
+    width: 100%; background: white; border-radius: 12px;
+    padding: 15px; border: 1px solid #eee; box-sizing: border-box;
+  }
+  .rg-skeleton {
+    background: #f6f7f8;
+    background-image: linear-gradient(to right, #f6f7f8 0%, #edeef1 20%, #f6f7f8 40%, #f6f7f8 100%);
+    background-repeat: no-repeat;
+    background-size: 1000px 100%;
+    animation: shimmer 1.5s infinite linear;
+    border-radius: 4px;
+    margin-bottom: 10px;
+  }
+  .rg-sk-img  { height: 180px; width: 100%; margin-bottom: 15px; border-radius: 8px; }
+  .rg-sk-line { height: 14px; width: 100%; }
+  .rg-sk-line.short { width: 60%; }
+
+  /* Empty state */
+  .rg-empty-state {
+    text-align: center; padding: 60px 20px;
+    background: white; border-radius: 12px;
+    border: 1px dashed #ddd; width: 100%;
+    margin-top: 20px; display: none;
+  }
+
+  /* Image wrap */
+  .rg-image-wrap {
+    position: relative;
+    {% if cfg_show_lightbox %}cursor: zoom-in;{% endif %}
+    width: 100%; overflow: hidden;
+    background: #f5f5f5;
+    aspect-ratio: 4/3;
+  }
+  .rg-image-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
+  .rg-image-wrap:hover img { transform: scale(1.05); }
+
+  .rg-video-icon-small {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.7); color: white;
+    border-radius: 50%; width: 50px; height: 50px;
+    display: flex; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 2;
+  }
+  .rg-zoom-icon {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.6); color: white;
+    border-radius: 50%; width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 3;
+  }
+  .rg-image-wrap:hover .rg-zoom-icon { opacity: 1; }
+
+  /* Card content */
+  .rg-content { padding: 15px; }
+  .rg-header  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+  .rg-author-line { display: flex; align-items: center; gap: 8px; }
+  .rg-author  { font-weight: 600; font-size: 15px; color: {{ cfg_text_color }}; }
+  .rg-date    { font-size: 12px; color: #999; white-space: nowrap; margin-left: auto; }
+  .rg-stars   { color: {{ cfg_star_color }}; margin-bottom: 10px; font-size: 15px; letter-spacing: 1px; }
+  .rg-body    { font-size: 14px; color: {{ cfg_text_color }}; line-height: 1.6; margin-bottom: 10px; opacity: 0.9; }
+  .rg-meta    { border-top: 1px solid rgba(0,0,0,0.05); padding-top: 10px; font-size: 12px; color: #666; font-weight: 500; }
+  .rg-meta strong { font-weight: 600; color: #333; display: block; margin-bottom: 2px; }
+
+  .rg-verified {
+    color: {{ cfg_text_color }};
+    font-size: 11px;
+    display: inline-flex; align-items: center;
+    font-weight: 500;
+    background: rgba(0,0,0,0.05);
+    padding: 3px 8px; border-radius: 20px; white-space: nowrap;
+  }
+  .rg-verified svg { width: 11px; height: 11px; margin-right: 4px; fill: {{ cfg_verified_color }}; }
+  .rg-unverified svg { fill: #aaa; }
+
+  /* Load more */
+  .rg-load-more-wrap { text-align: center; margin-top: 50px; padding-top: 10px; }
+  .rg-load-more {
+    padding: 14px 45px;
+    background: {{ cfg_button_bg }};
+    border: 2px solid {{ cfg_button_bg }};
+    border-radius: 30px;
+    font-size: 14px; font-weight: 600;
+    color: {{ cfg_button_text }};
+    cursor: pointer; transition: all 0.3s ease; display: inline-block;
+  }
+  .rg-load-more:hover { opacity: 0.9; transform: translateY(-2px); }
+  .rg-load-more.hidden { display: none; }
+
+  /* Lightbox modal */
+  .rg-modal {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.9);
+    z-index: 10000;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+    padding: 20px; backdrop-filter: blur(5px);
+  }
+  .rg-modal.active { opacity: 1; pointer-events: auto; }
+  .rg-modal-content {
+    position: relative; display: flex;
+    width: 100%; max-height: 95vh; max-width: 1200px;
+    background: transparent; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+  }
+  .rg-modal-left {
+    flex: 0 0 65%; background: #1a1a1a;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+    height: 100%; max-height: 95vh; min-height: 400px;
+  }
+  .rg-modal-video, .rg-modal-img { width: 100%; height: 100%; object-fit: contain; display: block; max-height: 95vh; }
+  .rg-modal-right {
+    flex: 1; background: white; padding: 30px;
+    overflow-y: auto; display: flex; flex-direction: column; max-height: 95vh;
+  }
+  .rg-caption-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+  .rg-caption-author { font-weight: 700; font-size: 18px; color: #111; }
+  .rg-caption-date   { font-size: 13px; color: #888; }
+  .rg-caption-stars  { color: {{ cfg_star_color }}; font-size: 18px; margin-bottom: 15px; }
+  .rg-caption-body   { font-size: 15px; color: #333; line-height: 1.7; flex-grow: 1; }
+
+  .rg-close, .rg-prev, .rg-next {
+    position: absolute; background: rgba(255,255,255,0.9); color: #111;
+    border: none; cursor: pointer; width: 44px; height: 44px;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; transition: all 0.2s; z-index: 10;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  }
+  .rg-close:hover, .rg-prev:hover, .rg-next:hover { background: white; transform: scale(1.1); }
+  .rg-close { top: 20px; right: 20px; z-index: 10001; position: fixed; }
+  .rg-prev  { left: 20px; top: 50%; transform: translateY(-50%); }
+  .rg-next  { right: 20px; top: 50%; transform: translateY(-50%); }
+
+  @media (max-width: 900px) {
+    .rg-modal-content { flex-direction: column; max-height: 95vh; }
+    .rg-modal-left  { flex: 0 0 auto; max-height: 50vh; min-height: 300px; }
+    .rg-modal-right { flex: 1; max-height: 45vh; }
+    .rg-close { top: 10px; right: 10px; width: 36px; height: 36px; font-size: 18px; }
+  }
+
+  @media (max-width: 768px) {
+    .rg-grid { flex-direction: column; }
+    .rg-column { width: 100%; }
+  }
+
+  /* ── Write a Review Modal ───────────────────────────────────────────────── */
+  .rg-review-form-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,10,20,0.72);
+    backdrop-filter: blur(8px);
+    z-index: 20000;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.35s cubic-bezier(0.4,0,0.2,1);
+  }
+  .rg-review-form-overlay.active { opacity: 1; pointer-events: auto; }
+
+  .rg-review-form-box {
+    background: #ffffff; border-radius: 20px;
+    width: 100%; max-width: 560px; max-height: 92vh;
+    overflow-y: auto;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.35);
+    transform: translateY(30px) scale(0.97);
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.35s ease;
+    opacity: 0; position: relative;
+    scrollbar-width: thin; scrollbar-color: #ddd transparent;
+  }
+  .rg-review-form-overlay.active .rg-review-form-box { transform: translateY(0) scale(1); opacity: 1; }
+
+  .rg-review-form-top-bar {
+    height: 5px; width: 100%;
+    background: linear-gradient(90deg, {{ cfg_form_accent }}, {{ cfg_star_color }});
+    border-radius: 20px 20px 0 0;
+  }
+  .rg-review-form-inner { padding: 32px 36px 36px; }
+  @media (max-width: 600px) { .rg-review-form-inner { padding: 24px 20px 28px; } }
+
+  .rg-rf-close {
+    position: absolute; top: 18px; right: 18px;
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: rgba(0,0,0,0.06);
+    color: #555; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s, transform 0.2s; z-index: 2; line-height: 1;
+  }
+  .rg-rf-close:hover { background: rgba(0,0,0,0.12); color: #111; transform: scale(1.1); }
+
+  .rg-rf-title    { font-size: 22px; font-weight: 800; color: #111; margin: 0 0 6px; padding-right: 40px; }
+  .rg-rf-subtitle { font-size: 14px; color: #888; margin: 0 0 28px; line-height: 1.5; }
+
+  .rg-rf-label { display: block; font-size: 13px; font-weight: 600; color: #444; margin-bottom: 8px; }
+  .rg-rf-label span { color: #bbb; font-weight: 400; font-size: 12px; margin-left: 4px; }
+
+  .rg-rf-stars { display: flex; gap: 6px; margin-bottom: 24px; }
+  .rg-rf-stars .rg-star-btn {
+    font-size: 32px; background: none; border: none;
+    cursor: pointer; color: #ddd; transition: color 0.15s, transform 0.15s;
+    padding: 0; line-height: 1;
+  }
+  .rg-rf-stars .rg-star-btn:hover,
+  .rg-rf-stars .rg-star-btn.selected { color: {{ cfg_star_color }}; }
+  .rg-rf-stars .rg-star-btn:hover { transform: scale(1.2); }
+
+  .rg-rf-field { margin-bottom: 18px; }
+  .rg-rf-input, .rg-rf-textarea {
+    width: 100%; padding: 12px 16px;
+    border: 1.5px solid #e5e7eb; border-radius: 10px;
+    font-size: 14px; color: #222; background: #fafafa;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box; font-family: inherit; resize: none;
+  }
+  .rg-rf-input:focus, .rg-rf-textarea:focus {
+    border-color: {{ cfg_form_accent }};
+    background: #fff;
+    box-shadow: 0 0 0 3px {{ cfg_form_accent }}18;
+  }
+  .rg-rf-input::placeholder, .rg-rf-textarea::placeholder { color: #bbb; }
+  .rg-rf-textarea { min-height: 110px; line-height: 1.6; }
+
+  .rg-rf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  @media (max-width: 480px) { .rg-rf-row { grid-template-columns: 1fr; } }
+  .rg-rf-row .rg-rf-field { margin-bottom: 0; }
+
+  .rg-rf-upload-area {
+    border: 2px dashed #e0e0e0; border-radius: 10px; padding: 20px;
+    text-align: center; cursor: pointer; background: #fafafa;
+    transition: border-color 0.2s, background 0.2s;
+    margin-bottom: 24px; position: relative; overflow: hidden;
+  }
+  .rg-rf-upload-area:hover { border-color: {{ cfg_form_accent }}; background: #fff; }
+  .rg-rf-upload-area input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .rg-rf-upload-icon  { font-size: 26px; margin-bottom: 6px; display: block; }
+  .rg-rf-upload-text  { font-size: 13px; color: #888; line-height: 1.5; }
+  .rg-rf-upload-text strong { color: {{ cfg_form_accent }}; }
+  .rg-rf-upload-preview { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
+  .rg-rf-upload-preview img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #eee; }
+
+  .rg-rf-submit {
+    width: 100%; padding: 14px 20px;
+    background: {{ cfg_form_accent }};
+    color: #fff; border: none; border-radius: 12px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: all 0.25s ease; letter-spacing: 0.3px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .rg-rf-submit:hover:not(:disabled) { opacity: 0.88; transform: translateY(-2px); box-shadow: 0 8px 20px {{ cfg_form_accent }}40; }
+  .rg-rf-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+  .rg-rf-submit svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+  .rg-rf-spinner {
+    width: 18px; height: 18px;
+    border: 2.5px solid rgba(255,255,255,0.4);
+    border-top-color: #fff; border-radius: 50%;
+    animation: rg-spin 0.7s linear infinite; flex-shrink: 0;
+  }
+  @keyframes rg-spin { to { transform: rotate(360deg); } }
+
+  .rg-rf-success {
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 20px 10px 10px; min-height: 200px;
+  }
+  .rg-rf-success-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: linear-gradient(135deg, {{ cfg_form_accent }}, {{ cfg_star_color }});
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px; box-shadow: 0 8px 24px {{ cfg_form_accent }}35;
+  }
+  .rg-rf-success-icon svg { width: 30px; height: 30px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .rg-rf-success-title { font-size: 20px; font-weight: 800; color: #111; margin: 0 0 10px; }
+  .rg-rf-success-msg   { font-size: 15px; color: #666; line-height: 1.6; max-width: 380px; margin: 0 auto 24px; }
+  .rg-rf-close-success {
+    padding: 12px 32px;
+    background: {{ cfg_form_accent }};
+    color: #fff; border: none; border-radius: 10px;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+  }
+  .rg-rf-close-success:hover { opacity: 0.85; }
+
+  .rg-rf-star-label { font-size: 13px; color: {{ cfg_star_color }}; font-weight: 600; min-height: 18px; margin-top: -16px; margin-bottom: 18px; }
+  .rg-rf-error-msg  { font-size: 12px; color: #e53e3e; margin-top: 5px; display: none; }
+  .rg-rf-input.error, .rg-rf-textarea.error { border-color: #e53e3e; }
+</style>
+
+<!-- ── SECTION HTML ───────────────────────────────────────────────────────── -->
+<div id="rg-reviews" class="rg-container-{{ section.id }}">
+
+  {% if cfg_heading != blank %}
+    <h2 class="rg-section-title">{{ cfg_heading }}</h2>
+  {% endif %}
+
+  <div id="rg-header-{{ section.id }}" class="rg-header-section">
+    <div class="rg-rating-summary">
+      <div class="rg-total-stars">
+        {%- for i in (1..5) -%}
+          {%- if i <= stars_floor -%}★
+          {%- elsif i == stars_next and stars_dec > 0.4 -%}★
+          {%- else -%}☆
+          {%- endif -%}
+        {%- endfor -%}
+      </div>
+      <div class="rg-rating-info">
+        <div class="rg-avg-rating"><span id="rg-avg-{{ section.id }}">{{ meta_rating }}</span> out of 5</div>
+        <div class="rg-review-count"><span id="rg-count-{{ section.id }}">{{ meta_count }}+</span> Reviews</div>
+      </div>
+    </div>
+
+    <div class="rg-filter-section">
+      {% if cfg_show_search %}
+        <input type="text" id="rg-search-{{ section.id }}" class="rg-search-input" placeholder="Search reviews...">
+      {% endif %}
+
+      {% if cfg_show_filters %}
+        <button class="rg-filter-btn active" data-filter="all">All</button>
+        <button class="rg-filter-btn" data-filter="5">5 ★</button>
+        <button class="rg-filter-btn" data-filter="4">4 ★</button>
+        <button class="rg-filter-btn" data-filter="3">3 ★</button>
+      {% endif %}
+
+      {% if cfg_show_sorting %}
+        <select class="rg-sort-select" id="rg-sort-{{ section.id }}">
+          <option value="recent">Original Order</option>
+          <option value="highest">Highest Rating</option>
+          <option value="lowest">Lowest Rating</option>
+        </select>
+      {% endif %}
+
+      {% if cfg_show_write_btn %}
+        <button class="rg-write-review-btn" id="rg-open-review-form-{{ section.id }}" type="button">
+          <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          {{ cfg_form_title | default: 'Write a Review' }}
+        </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Skeleton loader -->
+  <div id="rg-loading-{{ section.id }}" class="rg-grid">
+    {% for i in (1..6) %}
+      <div class="rg-skeleton-card">
+        <div class="rg-skeleton rg-sk-img"></div>
+        <div class="rg-skeleton rg-sk-line"></div>
+        <div class="rg-skeleton rg-sk-line"></div>
+        <div class="rg-skeleton rg-sk-line short"></div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div id="rg-empty-{{ section.id }}" class="rg-empty-state">
+    <div style="font-size:40px; margin-bottom:10px; color:#ccc;">★</div>
+    <div style="color:#666; font-size:16px;">No reviews found.</div>
+  </div>
+
+  <div id="rg-grid-{{ section.id }}" class="rg-grid"></div>
+
+  {% if cfg_show_load_more %}
+    <div class="rg-load-more-wrap">
+      <button id="rg-load-more-{{ section.id }}" class="rg-load-more hidden">Show More Reviews</button>
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- ── LIGHTBOX ──────────────────────────────────────────────────────────── -->
+{% if cfg_show_lightbox %}
+<div id="ReviewModal-{{ section.id }}" class="rg-modal">
+  <div class="rg-modal-content">
+    <div class="rg-modal-left">
+      <button class="rg-close" onclick="rgCloseModal('{{ section.id }}')">✕</button>
+      <div id="modal-media-wrap-{{ section.id }}" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"></div>
+      <button class="rg-prev" onclick="rgChangeSlide('{{ section.id }}', -1)">❮</button>
+      <button class="rg-next" onclick="rgChangeSlide('{{ section.id }}',  1)">❯</button>
+    </div>
+    <div class="rg-modal-right">
+      <div id="modal-caption-{{ section.id }}"></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── WRITE A REVIEW MODAL ──────────────────────────────────────────────── -->
+{% if cfg_show_write_btn %}
+<div id="rg-review-form-overlay-{{ section.id }}" class="rg-review-form-overlay" role="dialog" aria-modal="true">
+  <div class="rg-review-form-box">
+    <div class="rg-review-form-top-bar"></div>
+    <button class="rg-rf-close" id="rg-rf-close-{{ section.id }}" type="button">✕</button>
+    <div class="rg-review-form-inner">
+
+      <div id="rg-rf-form-area-{{ section.id }}">
+        <h3 class="rg-rf-title">{{ cfg_form_title }}</h3>
+        <p class="rg-rf-subtitle">{{ cfg_form_subtitle }}</p>
+
+        <label class="rg-rf-label">Your Rating <span>*</span></label>
+        <div class="rg-rf-stars" id="rg-rf-stars-{{ section.id }}" role="group">
+          <button class="rg-star-btn" data-val="1" type="button">★</button>
+          <button class="rg-star-btn" data-val="2" type="button">★</button>
+          <button class="rg-star-btn" data-val="3" type="button">★</button>
+          <button class="rg-star-btn" data-val="4" type="button">★</button>
+          <button class="rg-star-btn" data-val="5" type="button">★</button>
+        </div>
+        <div class="rg-rf-star-label" id="rg-rf-star-label-{{ section.id }}"></div>
+
+        <div class="rg-rf-row">
+          <div class="rg-rf-field">
+            <label class="rg-rf-label">Your Name <span>*</span></label>
+            <input class="rg-rf-input" id="rg-rf-name-{{ section.id }}" type="text" placeholder="e.g. Sarah M." maxlength="80">
+            <div class="rg-rf-error-msg" id="rg-rf-name-err-{{ section.id }}">Please enter your name.</div>
+          </div>
+          <div class="rg-rf-field">
+            <label class="rg-rf-label">Email <span style="font-weight:400;color:#bbb;font-size:12px;">(private)</span></label>
+            <input class="rg-rf-input" id="rg-rf-email-{{ section.id }}" type="email" placeholder="you@email.com">
+            <div class="rg-rf-error-msg" id="rg-rf-email-err-{{ section.id }}">Please enter a valid email.</div>
+          </div>
+        </div>
+
+        <div class="rg-rf-field">
+          <label class="rg-rf-label">Your Review <span>*</span></label>
+          <textarea class="rg-rf-textarea" id="rg-rf-body-{{ section.id }}" placeholder="Tell us what you loved about this product…" maxlength="2000"></textarea>
+          <div class="rg-rf-error-msg" id="rg-rf-body-err-{{ section.id }}">Please write your review.</div>
+        </div>
+
+        <label class="rg-rf-label">Add Photos <span style="font-weight:400;color:#bbb;font-size:12px;">(optional)</span></label>
+        <div class="rg-rf-upload-area" id="rg-rf-upload-area-{{ section.id }}">
+          <input type="file" id="rg-rf-photos-{{ section.id }}" accept="image/*" multiple>
+          <span class="rg-rf-upload-icon">📷</span>
+          <div class="rg-rf-upload-text"><strong>Click to upload</strong> or drag & drop<br>JPG, PNG, WEBP up to 5MB</div>
+          <div class="rg-rf-upload-preview" id="rg-rf-preview-{{ section.id }}"></div>
+        </div>
+
+        <button class="rg-rf-submit" id="rg-rf-submit-{{ section.id }}" type="button">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+          Submit Review
+        </button>
+      </div>
+
+      <div class="rg-rf-success" id="rg-rf-success-{{ section.id }}">
+        <div class="rg-rf-success-icon">
+          <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="rg-rf-success-title">Review Submitted!</div>
+        <div class="rg-rf-success-msg">{{ cfg_form_success }}</div>
+        <button class="rg-rf-close-success" type="button" onclick="rgCloseReviewForm('{{ section.id }}')">Close</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── JAVASCRIPT ────────────────────────────────────────────────────────── -->
+<script>
+(function() {
+  const SID = '{{ section.id }}';
+
+  /* ── Column mapping ── */
+  const COL_PRODUCT  = 0, COL_RATING  = 1, COL_AUTHOR = 2,
+        COL_EMAIL    = 3, COL_BODY    = 4, COL_DATE   = 5,
+        COL_PHOTO    = 6, COL_VERIFIED= 7, COL_VARIANT= 8;
+
+  /* ── Settings from metafield (passed via Liquid) ── */
+  const settings = {
+    csvUrl:         {{ cfg_csv_url | json }},
+    initialLoad:    {{ cfg_initial_load }},
+    loadMoreCount:  {{ cfg_load_more }},
+    showVerified:   {{ cfg_show_verified }},
+    enableLightbox: {{ cfg_show_lightbox }},
+    cardLayout:     {{ cfg_card_layout | json }},
+    colsDesktop:    {{ cfg_cols_desktop }},
+    colsMobile:     {{ cfg_cols_mobile }},
+    submitUrl:      {{ cfg_form_submit_url | json }},
+    starColor:      {{ cfg_star_color | json }},
+  };
+
+  /* ── DOM refs ── */
+  const gridEl     = document.getElementById('rg-grid-'      + SID);
+  const loadingEl  = document.getElementById('rg-loading-'   + SID);
+  const emptyEl    = document.getElementById('rg-empty-'     + SID);
+  const loadMoreBtn= document.getElementById('rg-load-more-' + SID);
+  const sortSelect = document.getElementById('rg-sort-'      + SID);
+  const searchInput= document.getElementById('rg-search-'    + SID);
+
+  let allReviews = [], filteredReviews = [], lightboxImages = [];
+  let currentSlide = 0, currentLimit = 0;
+
+  /* ── 1. Fetch CSV ── */
+  if (settings.csvUrl) {
+    const sep = settings.csvUrl.includes('?') ? '&' : '?';
+    fetch(settings.csvUrl + sep + 't=' + Date.now())
+      .then(r => r.text())
+      .then(text => parseAndRender(text))
+      .catch(e => {
+        loadingEl.style.display = 'none';
+        gridEl.innerHTML = '<div style="padding:20px;color:red;">Error loading reviews. Check your CSV link.</div>';
+        console.error(e);
+      });
+  } else {
+    loadingEl.style.display = 'none';
+    gridEl.innerHTML = '<div style="padding:20px;color:#666;">No CSV configured. Please add a CSV link in your app settings.</div>';
+  }
+
+  /* ── 2. Parse CSV ── */
+  function parseAndRender(csvText) {
+    const rows = csvToArray(csvText);
+    allReviews = [];
+    if (rows.length > 0) rows.shift();
+
+    rows.forEach((row, idx) => {
+      if (row.length < 3) return;
+
+      const rawMedia = (row[COL_PHOTO] || '').trim();
+      let photoUrl = '', videoUrl = '';
+
+      if (rawMedia.length > 5) {
+        const isVideo = rawMedia.includes('.mp4') || rawMedia.includes('.mov') || rawMedia.includes('/videos/');
+        isVideo ? (videoUrl = rawMedia) : (photoUrl = rawMedia);
+      }
+
+      const rawVerified = (row[COL_VERIFIED] || '').replace(/^\uFEFF/, '').trim().toUpperCase();
+      const isVerified  = ['TRUE','1','YES','Y'].includes(rawVerified);
+
+      allReviews.push({
+        id: idx,
+        rating:   parseInt(row[COL_RATING]) || 5,
+        author:   row[COL_AUTHOR] || 'Customer',
+        body:     row[COL_BODY]   || '',
+        date:     row[COL_DATE]   || '',
+        dateObj:  new Date(row[COL_DATE] || Date.now()),
+        photoUrl, videoUrl,
+        hasMedia: photoUrl !== '' || videoUrl !== '',
+        isVerified,
+        variant: (row[COL_VARIANT] || '').trim(),
+      });
+    });
+
+    loadingEl.style.display = 'none';
+
+    if (allReviews.length > 0) {
+      filteredReviews = [...allReviews];
+      applySorting();
+      currentLimit = settings.initialLoad;
+      renderReviews();
+    } else {
+      emptyEl.style.display = 'block';
+    }
+  }
+
+  /* ── 3. Sort ── */
+  function applySorting() {
+    const v = sortSelect ? sortSelect.value : 'recent';
+    filteredReviews.sort((a, b) =>
+      v === 'highest' ? b.rating - a.rating :
+      v === 'lowest'  ? a.rating - b.rating :
+      a.id - b.id
+    );
+  }
+
+  /* ── 4. Render ── */
+  function renderReviews() {
+    lightboxImages = [];
+    let html = '', imgCounter = 0;
+    const toShow = filteredReviews.slice(0, currentLimit);
+
+    if (toShow.length === 0) {
+      emptyEl.style.display = 'block';
+      gridEl.innerHTML = '';
+      if (loadMoreBtn) loadMoreBtn.classList.add('hidden');
+      return;
+    }
+    emptyEl.style.display = 'none';
+
+    toShow.forEach(r => {
+      if (r.hasMedia) {
+        lightboxImages.push({ src: r.photoUrl, videoSrc: r.videoUrl, name: r.author, text: r.body, rating: r.rating, date: r.date, variant: r.variant, isVerified: r.isVerified });
+      }
+
+      const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+
+      let mediaHtml = '';
+      if (r.hasMedia) {
+        if (r.photoUrl) {
+          mediaHtml = `<div class="rg-image-wrap" ${settings.enableLightbox ? `onclick="rgOpenModal('${SID}',${imgCounter})"` : ''}>
+            <img src="${r.photoUrl}" alt="Review photo" loading="lazy">
+            ${settings.enableLightbox ? '<div class="rg-zoom-icon">🔍</div>' : ''}
+          </div>`;
+        } else if (r.videoUrl) {
+          mediaHtml = `<div class="rg-image-wrap" ${settings.enableLightbox ? `onclick="rgOpenModal('${SID}',${imgCounter})"` : ''}>
+            <video src="${r.videoUrl}#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover;display:block;"></video>
+            <div class="rg-video-icon-small">▶</div>
+            ${settings.enableLightbox ? '<div class="rg-zoom-icon">🔍</div>' : ''}
+          </div>`;
+        }
+        imgCounter++;
+      }
+
+      let verifiedHtml = '';
+      if (settings.showVerified) {
+        verifiedHtml = r.isVerified
+          ? `<span class="rg-verified"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg>Verified</span>`
+          : `<span class="rg-verified rg-unverified" style="opacity:0.45;"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg>Unverified</span>`;
+      }
+
+      html += `
+        <div class="rg-card" data-rating="${r.rating}">
+          ${mediaHtml}
+          <div class="rg-content">
+            <div class="rg-header">
+              <div class="rg-author-line">
+                <div class="rg-author">${r.author}</div>
+                ${verifiedHtml}
+              </div>
+              <div class="rg-date">${formatDate(r.date)}</div>
+            </div>
+            <div class="rg-stars">${stars}</div>
+            <div class="rg-body">${r.body}</div>
+            ${r.variant ? `<div class="rg-meta"><strong>Item:</strong> ${r.variant}</div>` : ''}
+          </div>
+        </div>`;
+    });
+
+    gridEl.innerHTML = html;
+    if (settings.cardLayout === 'masonry') applyMasonry();
+    if (loadMoreBtn) {
+      currentLimit < filteredReviews.length
+        ? loadMoreBtn.classList.remove('hidden')
+        : loadMoreBtn.classList.add('hidden');
+    }
+  }
+
+  /* ── 5. Masonry ── */
+  function applyMasonry() {
+    const cards = gridEl.querySelectorAll('.rg-card');
+    if (!cards.length) return;
+    const gap  = 12;
+    const cols = window.innerWidth >= 1024 ? settings.colsDesktop : (window.innerWidth >= 768 ? settings.colsMobile : 1);
+    const cw   = (gridEl.offsetWidth - gap * (cols - 1)) / cols;
+    const heights = Array(cols).fill(0);
+
+    cards.forEach(card => {
+      const col = heights.indexOf(Math.min(...heights));
+      card.style.left  = col * (cw + gap) + 'px';
+      card.style.top   = heights[col] + 'px';
+      card.style.width = cw + 'px';
+      heights[col] += card.offsetHeight + gap;
+    });
+    gridEl.style.height = Math.max(...heights) + 'px';
+  }
+
+  if (settings.cardLayout === 'masonry') {
+    let t;
+    window.addEventListener('resize', () => {
+      clearTimeout(t);
+      t = setTimeout(() => { if (gridEl.querySelectorAll('.rg-card').length) applyMasonry(); }, 250);
+    });
+  }
+
+  /* ── 6. Events ── */
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', () => { currentLimit += settings.loadMoreCount; renderReviews(); });
+  }
+
+  document.querySelectorAll('.rg-filter-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.rg-filter-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      const f = this.dataset.filter;
+      filteredReviews = f === 'all' ? [...allReviews] : allReviews.filter(r => r.rating === parseInt(f));
+      if (searchInput && searchInput.value) {
+        const t = searchInput.value.toLowerCase();
+        filteredReviews = filteredReviews.filter(r => r.body.toLowerCase().includes(t) || r.author.toLowerCase().includes(t));
+      }
+      applySorting(); currentLimit = settings.initialLoad; renderReviews();
+    });
+  });
+
+  if (sortSelect) sortSelect.addEventListener('change', () => { applySorting(); renderReviews(); });
+
+  if (searchInput) {
+    searchInput.addEventListener('input', e => {
+      const t = e.target.value.toLowerCase();
+      const activeFilter = (document.querySelector('.rg-filter-btn.active') || {}).dataset?.filter || 'all';
+      filteredReviews = allReviews.filter(r => {
+        const matchSearch = r.body.toLowerCase().includes(t) || r.author.toLowerCase().includes(t) || r.variant.toLowerCase().includes(t);
+        const matchStar   = activeFilter === 'all' || r.rating === parseInt(activeFilter);
+        return matchSearch && matchStar;
+      });
+      applySorting(); currentLimit = settings.initialLoad; renderReviews();
+    });
+  }
+
+  /* ── 7. Lightbox ── */
+  window.rgOpenModal = function(sid, index) {
+    if (sid !== SID) return;
+    currentSlide = index;
+    updateModal();
+    document.getElementById('ReviewModal-' + SID).classList.add('active');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.rgCloseModal = function(sid) {
+    if (sid !== SID) return;
+    const m = document.getElementById('ReviewModal-' + SID);
+    if (m) { m.classList.remove('active'); document.body.style.overflow = 'auto'; document.getElementById('modal-media-wrap-' + SID).innerHTML = ''; }
+  };
+
+  window.rgChangeSlide = function(sid, step) {
+    if (sid !== SID) return;
+    currentSlide = (currentSlide + step + lightboxImages.length) % lightboxImages.length;
+    updateModal();
+  };
+
+  function updateModal() {
+    const d = lightboxImages[currentSlide];
+    if (!d) return;
+    const mediaWrap = document.getElementById('modal-media-wrap-' + SID);
+    mediaWrap.innerHTML = d.videoSrc
+      ? `<video src="${d.videoSrc}" controls autoplay muted loop playsinline class="rg-modal-video"></video>`
+      : `<img src="${d.src}" class="rg-modal-img" alt="Review photo">`;
+
+    const stars = '★'.repeat(d.rating) + '☆'.repeat(5 - d.rating);
+    const verifiedHtml = d.isVerified
+      ? `<span class="rg-verified"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"></path></svg>Verified</span>`
+      : '';
+
+    document.getElementById('modal-caption-' + SID).innerHTML = `
+      <div class="rg-caption-header">
+        <div class="rg-caption-author">${d.name} ${verifiedHtml}</div>
+        <div class="rg-caption-date">${formatDate(d.date)}</div>
+      </div>
+      <div class="rg-caption-stars">${stars}</div>
+      <div class="rg-caption-body">${d.text}</div>
+      ${d.variant ? `<div style="margin-top:20px;padding-top:15px;border-top:1px solid #eee;font-size:13px;color:#888;"><strong>Item:</strong> ${d.variant}</div>` : ''}
+    `;
+  }
+
+  const modal = document.getElementById('ReviewModal-' + SID);
+  if (modal) modal.addEventListener('click', e => { if (e.target === modal) rgCloseModal(SID); });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { rgCloseModal(SID); rgCloseReviewForm(SID); }
+    if (modal && modal.classList.contains('active')) {
+      if (e.key === 'ArrowLeft')  rgChangeSlide(SID, -1);
+      if (e.key === 'ArrowRight') rgChangeSlide(SID,  1);
+    }
+  });
+
+  /* ── 8. Write a Review Form ── */
+  const overlay  = document.getElementById('rg-review-form-overlay-' + SID);
+  if (overlay) {
+    const openBtn    = document.getElementById('rg-open-review-form-' + SID);
+    const closeBtn   = document.getElementById('rg-rf-close-'         + SID);
+    const starsWrap  = document.getElementById('rg-rf-stars-'         + SID);
+    const starLabel  = document.getElementById('rg-rf-star-label-'    + SID);
+    const nameInput  = document.getElementById('rg-rf-name-'          + SID);
+    const emailInput = document.getElementById('rg-rf-email-'         + SID);
+    const bodyInput  = document.getElementById('rg-rf-body-'          + SID);
+    const submitBtn  = document.getElementById('rg-rf-submit-'        + SID);
+    const formArea   = document.getElementById('rg-rf-form-area-'     + SID);
+    const successArea= document.getElementById('rg-rf-success-'       + SID);
+    const photoInput = document.getElementById('rg-rf-photos-'        + SID);
+    const previewArea= document.getElementById('rg-rf-preview-'       + SID);
+
+    const starLabels = ['','Poor','Fair','Good','Very Good','Excellent'];
+    let selectedRating = 0;
+
+    if (openBtn)  openBtn.addEventListener('click',  () => rgOpenReviewForm(SID));
+    if (closeBtn) closeBtn.addEventListener('click', () => rgCloseReviewForm(SID));
+    overlay.addEventListener('click', e => { if (e.target === overlay) rgCloseReviewForm(SID); });
+
+    if (starsWrap) {
+      const starBtns = starsWrap.querySelectorAll('.rg-star-btn');
+      starBtns.forEach(btn => {
+        btn.addEventListener('mouseenter', function() {
+          const v = parseInt(this.dataset.val);
+          starBtns.forEach((s, i) => s.style.color = i < v ? settings.starColor : '#ddd');
+          starLabel.textContent = starLabels[v];
+        });
+        btn.addEventListener('mouseleave', () => {
+          starBtns.forEach((s, i) => s.style.color = i < selectedRating ? settings.starColor : '#ddd');
+          starLabel.textContent = selectedRating ? starLabels[selectedRating] : '';
+        });
+        btn.addEventListener('click', function() {
+          selectedRating = parseInt(this.dataset.val);
+          starBtns.forEach((s, i) => { s.classList.toggle('selected', i < selectedRating); s.style.color = i < selectedRating ? settings.starColor : '#ddd'; });
+          starLabel.textContent = starLabels[selectedRating];
+        });
+      });
+    }
+
+    if (photoInput) {
+      photoInput.addEventListener('change', function() {
+        previewArea.innerHTML = '';
+        Array.from(this.files).slice(0, 5).forEach(file => {
+          const reader = new FileReader();
+          reader.onload = e => { const img = document.createElement('img'); img.src = e.target.result; previewArea.appendChild(img); };
+          reader.readAsDataURL(file);
+        });
+      });
+    }
+
+    function showErr(el, id) { el.classList.add('error'); const e = document.getElementById(id); if (e) e.style.display = 'block'; }
+    function clearErr(el, id) { el.classList.remove('error'); const e = document.getElementById(id); if (e) e.style.display = 'none'; }
+
+    if (nameInput)  nameInput.addEventListener('input',  () => clearErr(nameInput,  'rg-rf-name-err-' + SID));
+    if (bodyInput)  bodyInput.addEventListener('input',  () => clearErr(bodyInput,  'rg-rf-body-err-' + SID));
+    if (emailInput) emailInput.addEventListener('input', () => clearErr(emailInput, 'rg-rf-email-err-'+ SID));
+
+    if (submitBtn) {
+      submitBtn.addEventListener('click', async function() {
+        let valid = true;
+        if (!nameInput?.value.trim())  { showErr(nameInput,  'rg-rf-name-err-' + SID);  valid = false; }
+        if (!bodyInput?.value.trim())  { showErr(bodyInput,  'rg-rf-body-err-' + SID);  valid = false; }
+        if (emailInput?.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value)) { showErr(emailInput, 'rg-rf-email-err-' + SID); valid = false; }
+        if (selectedRating === 0) { starLabel.textContent = 'Please select a rating'; starLabel.style.color = '#e53e3e'; valid = false; }
+        if (!valid) return;
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<div class="rg-rf-spinner"></div> Submitting…';
+
+        if (settings.submitUrl) {
+          fetch(settings.submitUrl, {
+            method: 'POST', mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ rating: selectedRating, author: nameInput.value.trim(), email: emailInput?.value.trim() || '', body: bodyInput.value.trim(), date: new Date().toISOString().split('T')[0], product: '{{ product.handle }}' })
+          }).catch(() => {});
+        }
+
+        setTimeout(() => { formArea.style.display = 'none'; successArea.style.display = 'flex'; submitBtn.disabled = false; }, 1500);
+      });
+    }
+  }
+
+  /* ── Global helpers ── */
+  window.rgOpenReviewForm = function(sid) {
+    const o = document.getElementById('rg-review-form-overlay-' + sid);
+    if (o) { o.classList.add('active'); document.body.style.overflow = 'hidden'; }
+  };
+  window.rgCloseReviewForm = function(sid) {
+    const o = document.getElementById('rg-review-form-overlay-' + sid);
+    if (o) { o.classList.remove('active'); document.body.style.overflow = 'auto'; }
+  };
+
+  /* ── Helpers ── */
+  function formatDate(str) {
+    if (!str) return '';
+    try {
+      const d = new Date(str);
+      return `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}/${d.getFullYear()}`;
+    } catch(e) { return str; }
+  }
+
+  function csvToArray(text) {
+    let p='', row=[''], ret=[row], i=0, r=0, s=true, l;
+    for (l of text) {
+      if ('"'===l) { if (s && l===p) row[i]+=l; s=!s; }
+      else if (','===l && s) l=row[++i]='';
+      else if ('\n'===l && s) { if('\r'===p) row[i]=row[i].slice(0,-1); row=ret[++r]=[l='']; i=0; }
+      else row[i]+=l;
+      p=l;
+    }
+    return ret;
+  }
+
+})();
+</script>
