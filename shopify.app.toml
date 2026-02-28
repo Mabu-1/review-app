@@ -1,6 +1,6 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "7f05797a4adbfbf41ec24f40a0f25ace"
+client_id = "dae9467be34f0a7e27d770e4de76d359"
 name = "Review-app"
 application_url = "https://review-app-9zoe.onrender.com"
 embedded = true
@@ -9,13 +9,21 @@ embedded = true
 automatically_update_urls_on_dev = true
 
 [webhooks]
-api_version = "2026-01"
+api_version = "2026-04"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/uninstalled" ]
+  uri = "/webhooks/app/uninstalled"
+
+  [[webhooks.subscriptions]]
+  topics = [ "app/scopes_update" ]
+  uri = "/webhooks/app/scopes_update"
 
 [access_scopes]
-# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_products,write_products"
-optional_scopes = [ ]
-use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "https://review-app-9zoe.onrender.com/api/auth" ]
+redirect_urls = [
+  "https://review-app-9zoe.onrender.com/api/auth",
+  "https://review-app-9zoe.onrender.com/api/auth/callback"
+]
